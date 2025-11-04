@@ -1,0 +1,5 @@
+PATH_CLIENTS = "clients"
+PATH_PROCESSED = "processed"
+PATH_NOMENCLATURE = "nomenclature\\wb_nomenclature.XLSX"
+FIN_FILE = "fin_report.csv"
+URL_ADVERTISING_COSTS = "https://advert-api.wildberries.ru/adv/v1/upd"
