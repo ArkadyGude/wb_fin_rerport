@@ -172,7 +172,7 @@ def get_advert_report(folder, headers, one_date):
             # print(get_data_advert.json())
             data_advert = process_data_advert(get_data_advert, one_date)
             list_data_advert.append(data_advert)
-            sleep(61)
+            sleep(20)
         # print(list_data_advert)
         df_advert = pd.DataFrame(
             [item for sublist in list_data_advert for item in sublist]

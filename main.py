@@ -48,7 +48,7 @@ def main():
                     continue
                 # sleep_second = 5
             else:
-                qty_days = 95
+                qty_days = 423
                 # sleep_second = 10
             date_list = get_date_list(qty_days)
             # print(date_list)
