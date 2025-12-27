@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+from time import sleep
 
 from storage_report import get_storage_report
 from advertising_costs import get_data_advert
@@ -25,16 +26,16 @@ from config import (
     PATH_NOMENCLATURE,
 )
 
-from settings import clients_list
+from settings import TAX_RATE, VAT_RATE
 
 
 def main():
-    # folders = get_folder_clients(PATH_CLIENTS)
-    folders = clients_list
+    folders = [os.path.join("clients", name) for name in TAX_RATE]
     print(folders)
     for folder in folders:
-        print(folder)
-        print(f"Сейчас обрабатывается {folder}. Подождите еще немного...")
+        name = os.path.basename(folder)
+        print(name)
+        print(f"Сейчас обрабатывается {name}. Подождите еще немного...")
         nomenclature_path = os.path.join(folder, PATH_NOMENCLATURE)
         # print(nomenclature_price)
         try:
@@ -46,9 +47,9 @@ def main():
                 if qty_days == 0:
                     print("Сегодня данные уже загружены.")
                     continue
-                # sleep_second = 5
+                # sleep(5)
             else:
-                qty_days = 423
+                qty_days = 86
                 # sleep_second = 10
             date_list = get_date_list(qty_days)
             # print(date_list)
@@ -117,14 +118,17 @@ def main():
                 )
 
                 report_fin_storage_advert["Налоги, руб"] = (
-                    (report_fin_storage_advert["Сумма реализации, руб"] * 0.02)
+                    (
+                        report_fin_storage_advert["Сумма реализации, руб"]
+                        * TAX_RATE[name]
+                    )
                     .replace("", np.nan)
                     .fillna(0)
                     .infer_objects(copy=False)
                 )
 
                 report_fin_storage_advert["НДС, руб"] = (
-                    (report_fin_storage_advert["Сумма реализации, руб"] * 0.05)
+                    (report_fin_storage_advert["Сумма реализации, руб"] * VAT_RATE)
                     .replace("", np.nan)
                     .fillna(0)
                     .infer_objects(copy=False)
@@ -183,7 +187,6 @@ def main():
                 )
 
                 report_fin_full = report_fin_full[report_fin_full["Дата"] != 0]
-
                 save_data(report_fin_full, data_file_path, FIN_FILE)
                 # sleep(sleep_second)
 

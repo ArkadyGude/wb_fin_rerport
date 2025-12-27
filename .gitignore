@@ -1,3 +1,4 @@
 clients/
 venv/
 __pycache__/
+settings.py

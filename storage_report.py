@@ -1,17 +1,7 @@
-import csv
-import os
-from pathlib import Path
 from time import sleep
-from datetime import datetime, timedelta
-from decouple import AutoConfig
-import requests
 import pandas as pd
 
 from utils import (
-    get_api_key,
-    get_headers,
-    count_days_from_last_date,
-    get_date_list,
     get_data,
 )
 
@@ -105,8 +95,6 @@ def get_storage_report(folder, headers, one_date):
             url_report_storage, headers, params_storage_request
         )
         task_id = response_report_storage.json()["data"]["taskId"]
-        # print(params_storage_request)
-        # print(task_id)
         status_report = get_status_report(url_storage, task_id, headers)
         done_storage_report = get_storage_data(url_storage, task_id, headers)
         sleep(10)
@@ -115,6 +103,3 @@ def get_storage_report(folder, headers, one_date):
         print("ERROR", folder, e)
 
     return done_storage_report
-
-
-# get_storage_report_final()

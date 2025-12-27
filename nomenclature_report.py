@@ -25,9 +25,6 @@ def get_nomenclature(headers):
     folders = get_folder_clents(PATH_CLIENTS)
     for folder in folders:
         try:
-            # api_key = get_api_key(folder)
-            # headers = get_headers(api_key)
-
             params = {
                 "settings": {"cursor": {"limit": 100}, "filter": {"withPhoto": -1}}
             }
@@ -74,4 +71,3 @@ def get_nomenclature(headers):
         except Exception as e:
             print("ERROR", e)
     return nomenclature_df
-

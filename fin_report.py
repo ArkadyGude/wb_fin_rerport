@@ -24,21 +24,11 @@ url_fin_report = (
 
 
 def get_insert_fin_data(date, nomenclature):
-    # df_nomenclature = get_nomenclature(path)
-    # df_nomenclature = get_nomenclature(headers)
     df_nomenclature = nomenclature
-
-    # df_nomenclature["Номер счета"] = df_nomenclature["id продавца"].astype(str) + str(
-    #     date
-    # ).replace("-", "")
     df_nomenclature["Дата"] = date
     df_nomenclature["Валюта отчёта"] = "RUB"
     df_nomenclature["Предмет"] = df_nomenclature["Предмет"]
     df_nomenclature["Артикул WB"] = df_nomenclature["Артикул WB"]
-    # df_nomenclature["Бренд"] = df_nomenclature["Бренд"].str.upper()
-    # df_nomenclature["Размер"] = df_nomenclature["Размер"]
-    # df_nomenclature["Баркод"] = df_nomenclature["Баркод"]
-    # df_nomenclature["Продажи, шт"] = 0
     df_nomenclature["Отказы, шт"] = 0
     df_nomenclature["Доставки, шт"] = 0
     df_nomenclature["Продажи, шт"] = 0
@@ -52,11 +42,9 @@ def get_insert_fin_data(date, nomenclature):
     df_nomenclature["Штрафы, руб"] = 0
     df_nomenclature["Платная приемка, руб"] = 0
 
-    # print(df_nomenclature.dtypes)
 
     df_nomenclature_result = df_nomenclature[
         [
-            # "Номер счета",
             "Дата",
             "Валюта отчёта",
             "Предмет",
@@ -76,7 +64,6 @@ def get_insert_fin_data(date, nomenclature):
         ]
     ]
 
-    # # print(df_nomenclature_result)
     return df_nomenclature_result
 
 
@@ -84,27 +71,19 @@ def process_fin_report(data):
 
     summary_df = pd.json_normalize(data)
     fin_data = summary_df
-
-    # # fin_data["Номер счета"] = summary_df["realizationreport_id"]
-    # # fin_data["Дата"] = date
     fin_data["Дата"] = summary_df["date_from"]
-    # fin_data["Валюта отчёта"] = "RUB"
     fin_data["Валюта отчёта"] = summary_df["currency_name"]
-    # fin_data["Номер строки"] = summary_df["rrd_id"]
-    # fin_data["Номер поставки"] = summary_df["gi_id"]
     fin_data["Предмет"] = summary_df["subject_name"]
     fin_data["Артикул WB"] = summary_df["nm_id"]
     fin_data["Артикул WB"] = pd.to_numeric(
         fin_data["Артикул WB"], errors="coerce"
     ).astype("Int64")
     fin_data["Бренд"] = summary_df["brand_name"].str.upper()
-    # # fin_data["Артикул продавца"] = summary_df["sa_name"]
     fin_data["Размер"] = summary_df["ts_name"]
     fin_data["Баркод"] = summary_df["barcode"]
     fin_data["Баркод"] = pd.to_numeric(fin_data["Баркод"], errors="coerce").astype(
         "Int64"
     )
-    # fin_data["Тип документа"] = summary_df["doc_type_name"]
     fin_data["Доставки, шт"] = summary_df["delivery_amount"].astype("Int64")
     fin_data["Отказы, шт"] = summary_df["return_amount"].astype("int64")
     fin_data["Продажи, шт"] = summary_df.apply(
@@ -120,21 +99,6 @@ def process_fin_report(data):
         lambda row: (row["quantity"] if row["supplier_oper_name"] == "Возврат" else 0),
         axis=1,
     ).astype("Int64")
-
-    # fin_data["Цена продавца"] = summary_df["retail_price_withdisc_rub"]
-    # fin_data["Продажи, руб"] = summary_df.apply(
-    #     lambda row: (
-    #         row["retail_price_withdisc_rub"]
-    #         * (
-    #             row["quantity"](
-    #                 -row["quantity"] if row["supplier_oper_name"] == "Возврат" else 0
-    #             )
-    #         )
-    #         if row["supplier_oper_name"] == "Продажа"
-    #         else 0
-    #     ),
-    #     axis=1,
-    # )
 
     fin_data["Продажи, руб"] = summary_df.apply(
         lambda row: (
@@ -256,8 +220,8 @@ def get_fin_report(folder, headers, one_date, nomenclature):
 
     # print(folder)
     print(f"Сейчас обрабатывается финотчет {folder}. Подождите еще немного...")
+    fin_report_done = None
     try:
-        # data_file_path = os.path.join(folder, PATH_PROCESSED)
         params_fin_report = {
             "dateFrom": one_date,
             "dateTo": one_date,
@@ -266,8 +230,13 @@ def get_fin_report(folder, headers, one_date, nomenclature):
         insert_data = get_insert_fin_data(one_date, nomenclature)
         response_fin_report = get_data(url_fin_report, headers, params_fin_report)
         print(f"response_fin_report {response_fin_report.status_code}")
-        fin_report = process_fin_report(response_fin_report.json())
-        fin_report_done = get_concat_data(insert_data, fin_report)
+        if response_fin_report.status_code == 200:
+            fin_report = process_fin_report(response_fin_report.json())
+            fin_report_done = get_concat_data(insert_data, fin_report)
+        elif response_fin_report.status_code == 204:
+            fin_report_done = insert_data
+        else:
+            raise ValueError(f"Непредвиденный статус-код API: {response_fin_report.status_code}")
         sleep(60)
 
     except Exception as e:

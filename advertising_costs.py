@@ -21,7 +21,6 @@ def get_data_advert(headers, date):
     params = {"from": date, "to": date}
 
     get_fin_advert_costs = get_data(URL_ADVERTISING_COSTS, headers=headers, params=params)
-    # print(get_fin_advert_costs.json())
 
     costs = 0
     for item in get_fin_advert_costs.json():

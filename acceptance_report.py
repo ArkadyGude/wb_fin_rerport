@@ -97,7 +97,6 @@ def get_acceptance_report(folder, headers, one_date):
             url_create_report, headers, params_acceptance_request
         )
 
-        # print(response_create_report.json())
         task_id = response_create_report.json()["data"]["taskId"]
         status_report = get_status_report(url_check_status, task_id, headers)
         done_acceptance_report = get_acceptance_data(url_acceptance, task_id, headers)

@@ -44,45 +44,6 @@ url_fin = "https://advert-api.wildberries.ru/adv/v1/upd"
 url_adv = "https://advert-api.wildberries.ru/adv/v3/fullstats"
 
 
-# def get_folder_clients(path_folder_clients):
-#     p = Path(path_folder_clients)
-#     clients = []
-#     for folder in p.glob("*"):
-#         client = str(folder)
-#         clients.append(client)
-#     return clients
-
-
-# def get_api_key(path):
-#     config = AutoConfig(search_path=path)
-#     api_key = config("api_key")
-#     return api_key
-
-
-# def get_headers(api_key):
-#     headers = {"Authorization": api_key}
-#     return headers
-
-
-# def get_date_list(num_days=0):
-#     date_from = datetime.now() - timedelta(days=num_days)
-#     date_to = datetime.now()
-#     step = timedelta(days=1)
-#     date_list = []
-#     while date_from < date_to:
-#         date_list.append(date_from.strftime("%Y-%m-%d"))
-#         date_from += step
-#     return date_list
-
-
-# def get_nomenclature(path):
-#     data = pd.read_excel(path)
-#     # json_data = data.to_json(orient='records', force_ascii=False)
-#     dict_data = data.to_dict("records")
-#     # print(dict_data)
-#     return dict_data
-
-
 def get_data(path, headers, params=None):
     task_completed = False
     res_get = None
@@ -116,27 +77,12 @@ def process_data_advert(data_advert, date):
     data_list = []
     for item in data_advert.json():
         for item_data in item["days"][0]["apps"]:
-            for item_nms in item_data['nms']:
+            for item_nms in item_data["nms"]:
                 data_dict = {
                     "дата": date,
                     "ID рекламной кампании": item["advertId"],
                     "Артикул WB": item_nms["nmId"],
-                    # "наименование": item_data["nms"][0]["name"],
-                    # "показов": item_data["nms"][0]["views"],
-                    # "кликов": item_data["nms"][0]["clicks"],
-                    # "ctr": str(item_data["nms"][0]["ctr"]).replace(".", ","),
-                    # "количество добавлений в корзину, шт": item_data["nms"][0]["atbs"],
-                    # "заказов, шт": item_data["nms"][0]["orders"],
-                    # "количество заказанных товаров, шт": item_data["nms"][0]["shks"],
-                    # "отменено, шт": item_data["nms"][0]["canceled"],
-                    # "cpc": str(item_data["nms"][0]["cpc"]).replace(".", ","),
-                    # "cr, количество заказов к количеству кликов": str(
-                    #     item_data["nms"][0]["cr"]
-                    # ).replace(".", ","),
                     "Затраты на рекламу, руб": item_nms["sum"],
-                    # "заказано на сумму, руб": str(item_data["nms"][0]["sum_price"]).replace(
-                    #     ".", ","
-                    # ),
                 }
                 data_list.append(data_dict)
     # print(data_list)
@@ -205,24 +151,4 @@ def get_advert_report(folder, headers, one_date):
         print("ERROR", e)
         advert_report = pd.DataFrame(columns=["Артикул WB", "Затраты на рекламу, руб"])
 
-    # if not (os.path.exists("advert.csv")):
-    #     advert_report.to_csv(
-    #         "advert.csv",
-    #         mode="w",
-    #         header=advert_report.columns,
-    #         index=False,
-    #         date_format="%Y-%m-%d",
-    #         sep=";",
-    #         encoding="utf-8-sig",
-    #     )
-    # else:
-    #     advert_report.to_csv(
-    #         "advert.csv",
-    #         mode="a",
-    #         header=False,
-    #         index=False,
-    #         date_format="%Y-%m-%d",
-    #         sep=";",
-    #         encoding="utf-8-sig",
-    #     )
     return advert_report
