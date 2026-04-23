@@ -25,14 +25,10 @@
 
 """
 
-from datetime import timedelta, datetime
 from time import sleep
-import csv
-import os
-from pathlib import Path
-from decouple import AutoConfig
-import requests
 import pandas as pd
+
+from utils import get_advert_safe
 
 PATH_CLIENTS = "clients"
 PATH_PROCESSED = "processed"
@@ -42,27 +38,6 @@ ADVERT_FILE = "advertising.csv"
 
 url_fin = "https://advert-api.wildberries.ru/adv/v1/upd"
 url_adv = "https://advert-api.wildberries.ru/adv/v3/fullstats"
-
-
-def get_data(path, headers, params=None):
-    task_completed = False
-    res_get = None
-    while not task_completed:
-        res_get = requests.get(path, headers=headers, params=params, timeout=35)
-        try:
-            res_get.raise_for_status()
-            task_completed = True
-        except requests.exceptions.HTTPError as e:
-            print(
-                f"Код ответа сервера: {e.response.status_code}"
-            )  # Мы можем получить код ответа
-            if e.response.status_code == 400:
-                task_completed = True
-            sleep(20)
-        except Exception as e:
-            print("ERROR", e)
-            sleep(20)
-    return res_get
 
 
 def get_adv_list(data):
@@ -85,7 +60,6 @@ def process_data_advert(data_advert, date):
                     "Затраты на рекламу, руб": item_nms["sum"],
                 }
                 data_list.append(data_dict)
-    # print(data_list)
     return data_list
 
 
@@ -96,59 +70,51 @@ def get_advert_report(folder, headers, one_date):
     try:
         print(one_date)
         day_load = {"from": one_date, "to": one_date}
-        get_fin_costs = get_data(url_fin, headers, day_load)
-        print(get_fin_costs.status_code)
+
+        get_fin_costs = get_advert_safe(url_fin, headers, day_load)
+        print(f"Статус истории затрат: {get_fin_costs.status_code}")
+
+        if get_fin_costs.status_code == 400:
+            print("Нет данных по затратам на рекламу за дату")
+            return 0
+
         adv_list = get_adv_list(get_fin_costs)
-        print(adv_list)
-        sleep(5)
+        print(f"Кампании: {adv_list}")
+
         list_data_advert = []
+
         for adv_item in adv_list:
-            print(adv_item)
             params_adv = {
                 "ids": adv_item,
                 "beginDate": one_date,
                 "endDate": one_date,
             }
-
-            get_data_advert = get_data(url_adv, headers, params_adv)
+            get_data_advert = get_advert_safe(url_adv, headers, params_adv)
             if get_data_advert.status_code == 400:
                 continue
-
-            print(get_data_advert.status_code)
-            # print(get_data_advert.json())
             data_advert = process_data_advert(get_data_advert, one_date)
             list_data_advert.append(data_advert)
-            sleep(20)
-        # print(list_data_advert)
-        df_advert = pd.DataFrame(
-            [item for sublist in list_data_advert for item in sublist]
-        )
-        if not df_advert.empty:
-            advert_report = (
-                df_advert.groupby(
-                    [
-                        "Артикул WB",
-                    ],
-                    dropna=False,
-                )
-                .agg(
-                    {
-                        "Затраты на рекламу, руб": "sum",
-                    }
-                )
-                .reset_index()
-            )
-            # print(advert_report)
-            # print(type(advert_report))
-        else:
-            advert_report = pd.DataFrame(
-                columns=["Артикул WB", "Затраты на рекламу, руб"]
-            )
+            sleep(1)
 
-            print(advert_report["Затраты на рекламу, руб"].sum())
+        if list_data_advert:
+            df_advert = pd.DataFrame(
+                [item for sublist in list_data_advert for item in sublist]
+            )
+            if not df_advert.empty:
+                advert_report = (
+                    df_advert.groupby("Артикул WB", dropna=False)
+                    .agg({"Затраты на рекламу, руб": "sum"})
+                    .reset_index()
+                )
+                cost_advert_report = advert_report["Затраты на рекламу, руб"].sum()
+            else:
+                cost_advert_report = 0
+        else:
+            cost_advert_report = 0
+
+        print(f"Сумма затрат на рекламу: {cost_advert_report}")
+        return cost_advert_report
 
     except Exception as e:
-        print("ERROR", e)
-        advert_report = pd.DataFrame(columns=["Артикул WB", "Затраты на рекламу, руб"])
-
-    return advert_report
+        print("Ошибка в get_advert_report:", e)
+        return 0

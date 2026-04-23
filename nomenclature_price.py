@@ -3,7 +3,6 @@ import pandas as pd
 
 def get_nomenclature_price(path):
     data = pd.read_excel(path)
-    # print(data)
 
     aggregated_data = (
         data.groupby(
@@ -19,6 +18,5 @@ def get_nomenclature_price(path):
         )
         .reset_index()
     )
-    # print(aggregated_data)
 
     return aggregated_data

@@ -1,11 +1,9 @@
-import os
-import csv
 from pathlib import Path
-from decouple import AutoConfig
+from time import sleep
 import requests
 import pandas as pd
 
-from utils import get_api_key, get_headers
+# from utils import get_api_key, get_headers
 from config import PATH_CLIENTS
 
 
@@ -32,6 +30,7 @@ def get_nomenclature(headers):
             item_list = []
 
             res = requests.post(url, headers=headers, json=params, timeout=35)
+            sleep(3)
 
             print(res.status_code)
             item_list.append(res.json())
@@ -50,9 +49,12 @@ def get_nomenclature(headers):
                             "filter": {"withPhoto": -1},
                         }
                     }
+
                     res = requests.post(url, headers=headers, json=params, timeout=35)
+                    sleep(3)
 
                 print(res.status_code)
+                sleep(5)
                 item_list.append(res.json())
 
             nomenclature_list = []

@@ -4,7 +4,8 @@ import numpy as np
 from time import sleep
 
 from storage_report import get_storage_report
-from advertising_costs import get_data_advert
+
+from advertising_report import get_advert_report
 from fin_report import get_fin_report
 from nomenclature_report import get_nomenclature
 
@@ -13,14 +14,12 @@ from utils import (
     get_headers,
     count_days_from_last_date,
     get_date_list,
-    # get_folder_clients,
     save_data,
 )
 
 from nomenclature_price import get_nomenclature_price
 
 from config import (
-    # PATH_CLIENTS,
     PATH_PROCESSED,
     FIN_FILE,
     PATH_NOMENCLATURE,
@@ -37,7 +36,6 @@ def main():
         print(name)
         print(f"Сейчас обрабатывается {name}. Подождите еще немного...")
         nomenclature_path = os.path.join(folder, PATH_NOMENCLATURE)
-        # print(nomenclature_price)
         try:
             data_file_path = os.path.join(folder, PATH_PROCESSED)
             api_key = get_api_key(folder)
@@ -47,12 +45,10 @@ def main():
                 if qty_days == 0:
                     print("Сегодня данные уже загружены.")
                     continue
-                # sleep(5)
+                sleep(5)
             else:
-                qty_days = 86
-                # sleep_second = 10
+                qty_days = 109
             date_list = get_date_list(qty_days)
-            # print(date_list)
             nomenclature = get_nomenclature(headers)
             for one_date in date_list:
                 print(one_date)
@@ -77,32 +73,33 @@ def main():
                         pd.to_datetime(one_date).date()
                     )
 
-                report_advert = get_data_advert(headers, one_date)
-
-                if report_advert == 0:
-                    report_fin_storage_advert = report_fin_storage.copy()
+                cost_report_advert = get_advert_report(folder, headers, one_date)
+                report_fin_storage_advert = report_fin_storage.copy()
+                if cost_report_advert == 0:
                     report_fin_storage_advert["Затраты на рекламу, руб"] = 0.0
                 else:
-                    # Устанавливаем величину рекламных затрат
-                    advertising_cost = float(report_advert)
-
-                    # Создаем объединённую таблицу
-                    report_fin_storage_advert = report_fin_storage.copy()
-
-                    # Суммируем продажи и рассчитываем коэффициент распределения расходов
                     total_sales = report_fin_storage_advert["Продажи, руб"].sum()
+                    print(f"total sales {total_sales}")
                     if total_sales > 0:
-                        ratio = advertising_cost / total_sales
+                        ratio = cost_report_advert / total_sales
+                        report_fin_storage_advert["Затраты на рекламу, руб"] = (
+                            report_fin_storage_advert["Продажи, руб"] * ratio
+                        )
                     else:
-                        ratio = 0
+                        new_df = pd.DataFrame(
+                            [
+                                {
+                                    "Дата": one_date,
+                                    "Валюта отчёта": "RUB",
+                                    "Затраты на рекламу, руб": cost_report_advert,
+                                }
+                            ]
+                        ).fillna(0)
+                        report_fin_storage_advert = pd.concat(
+                            [report_fin_storage_advert, new_df], ignore_index=True
+                        ).fillna(0)
 
-                    # Присваиваем расходы на рекламу согласно продажам
-                    report_fin_storage_advert["Затраты на рекламу, руб"] = (
-                        report_fin_storage_advert["Продажи, руб"] * ratio
-                    )
-
-                print(report_fin_storage_advert["Затраты на рекламу, руб"].sum())
-
+                print(f'{report_fin_storage_advert["Затраты на рекламу, руб"]}')
                 report_fin_storage_advert["Перечисление на РС, руб"] = (
                     (
                         report_fin_storage_advert["К перечислению за товар, руб"]
@@ -188,7 +185,7 @@ def main():
 
                 report_fin_full = report_fin_full[report_fin_full["Дата"] != 0]
                 save_data(report_fin_full, data_file_path, FIN_FILE)
-                # sleep(sleep_second)
+                sleep(10)
 
         except Exception as e:
             print("Ошибка в запросе", folder, e)

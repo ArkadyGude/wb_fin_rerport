@@ -1,9 +1,7 @@
 from time import sleep
 import pandas as pd
 
-from utils import (
-    get_data,
-)
+from utils import get_data, get_wb_safe
 
 
 PATH_CLIENTS = "clients"
@@ -17,70 +15,166 @@ url_report_storage = "https://seller-analytics-api.wildberries.ru/api/v1/paid_st
 url_storage = "https://seller-analytics-api.wildberries.ru/api/v1/paid_storage/tasks/"
 
 
-def get_status_report(url, task_id, headers):
-    """
-    Проверяем готовность отчета.
-    """
-    task_completed = False
+# def get_status_report(url, task_id, headers):
+#     """
+#     Проверяем готовность отчета.
+#     """
+#     task_completed = False
 
+#     while not task_completed:
+#         url_status_report = url + f"{task_id}/status"
+
+#         params_check_status = {"task_id": task_id}
+#         response_status_task = get_data(url_status_report, headers, params_check_status)
+
+#         try:
+#             response_status_task.raise_for_status()
+#             if response_status_task.json()["data"]["status"] == "done":
+#                 print(response_status_task.json()["data"]["status"])
+#                 task_completed = True
+#             elif response_status_task.json()["data"]["status"] != "done":
+#                 print(response_status_task.json()["data"]["status"])
+#                 sleep(5)
+#         except Exception as e:
+#             print("ERROR", e)
+
+#     return response_status_task.json()["data"]["status"]
+
+
+def get_status_report(url, task_id, headers):
+    task_completed = False
     while not task_completed:
         url_status_report = url + f"{task_id}/status"
-
         params_check_status = {"task_id": task_id}
-        response_status_task = get_data(url_status_report, headers, params_check_status)
+        # Заменяем get_data на get_wb_safe
+        response_status_task = get_wb_safe(
+            url_status_report, headers, params_check_status
+        )
 
-        try:
-            response_status_task.raise_for_status()
-            if response_status_task.json()["data"]["status"] == "done":
-                print(response_status_task.json()["data"]["status"])
-                task_completed = True
-            elif response_status_task.json()["data"]["status"] != "done":
-                print(response_status_task.json()["data"]["status"])
-                sleep(5)
-        except Exception as e:
-            print("ERROR", e)
+        data = response_status_task.json()
+        status = data["data"]["status"]
+        print(status)
 
-    return response_status_task.json()["data"]["status"]
+        if status == "done":
+            task_completed = True
+        else:
+            sleep(5)  # пауза между проверками статуса – остаётся
+    return status
+
+
+# def get_storage_data(url, task_id, headers):
+#     """
+#     Получаем готовый отчет
+
+#     """
+#     url_done_report = url + f"{task_id}/download"
+
+#     params = {"task_id": task_id}
+#     storage_done_report = get_data(url_done_report, headers, params)
+
+#     print(storage_done_report.status_code)
+
+#     storage_data = pd.json_normalize(storage_done_report.json())
+#     if not storage_data.empty:
+#         storage_report = storage_data.copy()
+
+#         storage_report["Артикул WB"] = storage_report["nmId"]
+#         storage_report["Хранение, руб"] = storage_report["warehousePrice"]
+#         storage_report = storage_report[["Артикул WB", "Хранение, руб"]]
+
+#         aggregated_storage = (
+#             storage_report.groupby(
+#                 [
+#                     "Артикул WB",
+#                 ],
+#                 dropna=False,
+#             )
+#             .agg(
+#                 {
+#                     "Хранение, руб": "sum",
+#                 }
+#             )
+#             .reset_index()
+#         )
+#     else:
+#         aggregated_storage = pd.DataFrame(columns=["Артикул WB", "Хранение, руб"])
+
+#     return aggregated_storage
 
 
 def get_storage_data(url, task_id, headers):
     """
-    Получаем готовый отчет
+    Получает готовый отчёт по платному хранению и возвращает агрегированный DataFrame.
 
+    Параметры:
+        url (str): базовый URL для запросов (например, "https://seller-analytics-api.wildberries.ru/api/v1/paid_storage/tasks/")
+        task_id (str): идентификатор задачи, полученный при создании отчёта
+        headers (dict): заголовки с авторизацией
+
+    Возвращает:
+        pd.DataFrame: с колонками ["Артикул WB", "Хранение, руб"]
     """
+    # Формируем URL для скачивания
     url_done_report = url + f"{task_id}/download"
-
     params = {"task_id": task_id}
-    storage_done_report = get_data(url_done_report, headers, params)
 
-    print(storage_done_report.status_code)
+    # Используем безопасную функцию с обработкой 429 и Retry-After
+    storage_done_report = get_wb_safe(url_done_report, headers, params)
 
-    storage_data = pd.json_normalize(storage_done_report.json())
-    if not storage_data.empty:
-        storage_report = storage_data.copy()
+    print(f"Статус скачивания отчёта: {storage_done_report.status_code}")
 
-        storage_report["Артикул WB"] = storage_report["nmId"]
-        storage_report["Хранение, руб"] = storage_report["warehousePrice"]
-        storage_report = storage_report[["Артикул WB", "Хранение, руб"]]
+    # Парсим JSON-ответ
+    data_json = storage_done_report.json()
 
-        aggregated_storage = (
-            storage_report.groupby(
-                [
-                    "Артикул WB",
-                ],
-                dropna=False,
-            )
-            .agg(
-                {
-                    "Хранение, руб": "sum",
-                }
-            )
-            .reset_index()
-        )
-    else:
-        aggregated_storage = pd.DataFrame(columns=["Артикул WB", "Хранение, руб"])
+    # Если отчёт пустой (нет данных за период), возвращаем пустой DataFrame
+    if not data_json:
+        print("Нет данных по хранению за указанную дату")
+        return pd.DataFrame(columns=["Артикул WB", "Хранение, руб"])
+
+    # Нормализуем JSON в DataFrame
+    storage_data = pd.json_normalize(data_json)
+
+    # Если после нормализации DataFrame пустой – возвращаем пустой
+    if storage_data.empty:
+        return pd.DataFrame(columns=["Артикул WB", "Хранение, руб"])
+
+    # Берём нужные колонки и переименовываем
+    storage_report = storage_data.copy()
+    storage_report["Артикул WB"] = storage_report["nmId"]
+    storage_report["Хранение, руб"] = storage_report["warehousePrice"]
+
+    # Агрегируем по артикулу (суммируем стоимость хранения)
+    aggregated_storage = (
+        storage_report.groupby("Артикул WB", dropna=False)
+        .agg({"Хранение, руб": "sum"})
+        .reset_index()
+    )
 
     return aggregated_storage
+
+
+# def get_storage_report(folder, headers, one_date):
+#     print(f"Сейчас обрабатывается хранение {folder}. Подождите еще немного...")
+#     try:
+#         params_storage_request = {
+#             "dateFrom": one_date,
+#             "dateTo": one_date,
+#         }
+#         sleep(60)
+#         response_report_storage = get_data(
+#             url_report_storage, headers, params_storage_request
+#         )
+#         task_id = response_report_storage.json()["data"]["taskId"]
+#         sleep(60)
+#         status_report = get_status_report(url_storage, task_id, headers)
+#         sleep(60)
+#         done_storage_report = get_storage_data(url_storage, task_id, headers)
+#         sleep(10)
+
+#     except Exception as e:
+#         print("ERROR", folder, e)
+
+#     return done_storage_report
 
 
 def get_storage_report(folder, headers, one_date):
@@ -90,16 +184,18 @@ def get_storage_report(folder, headers, one_date):
             "dateFrom": one_date,
             "dateTo": one_date,
         }
-
-        response_report_storage = get_data(
+        # Убираем sleep(60) – get_wb_safe сам сделает паузу при 429
+        response_report_storage = get_wb_safe(
             url_report_storage, headers, params_storage_request
         )
         task_id = response_report_storage.json()["data"]["taskId"]
+        # Убираем sleep(60) – get_status_report будет сам ждать готовности задачи
         status_report = get_status_report(url_storage, task_id, headers)
+        # Убираем sleep(60) – get_storage_data использует get_wb_safe
         done_storage_report = get_storage_data(url_storage, task_id, headers)
+        # Оставляем небольшой sleep для разгрузки между датами (опционально)
         sleep(10)
-
     except Exception as e:
         print("ERROR", folder, e)
-
+        done_storage_report = pd.DataFrame(columns=["Артикул WB", "Хранение, руб"])
     return done_storage_report

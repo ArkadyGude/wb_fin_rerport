@@ -2,3 +2,6 @@ clients/
 venv/
 __pycache__/
 settings.py
+advert.py
+settings.py
+settings.py

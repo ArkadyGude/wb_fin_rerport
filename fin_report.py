@@ -14,9 +14,10 @@
 
 """
 
-from time import sleep
 import pandas as pd
-from utils import get_data
+
+from utils import get_wb_safe
+
 
 url_fin_report = (
     "https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod"
@@ -42,9 +43,9 @@ def get_insert_fin_data(date, nomenclature):
     df_nomenclature["Штрафы, руб"] = 0
     df_nomenclature["Платная приемка, руб"] = 0
 
-
     df_nomenclature_result = df_nomenclature[
         [
+            # "Номер счета",
             "Дата",
             "Валюта отчёта",
             "Предмет",
@@ -129,16 +130,16 @@ def process_fin_report(data):
         fin_data["Вайлдберриз реализовал Товар (Пр)"] + fin_data["Возвраты, руб"]
     )
 
-    fin_data["К перечислению за товар, руб"] = summary_df.apply(
-        lambda row: (
-            row["ppvz_for_pay"] if row["supplier_oper_name"] == "Продажа" else 0
-        ),
-        axis=1,
-    ) - summary_df.apply(
-        lambda row: (
-            row["ppvz_for_pay"] if row["supplier_oper_name"] == "Возврат" else 0
-        ),
-        axis=1,
+    mask_sale = summary_df["supplier_oper_name"] == "Продажа"
+    mask_return = summary_df["supplier_oper_name"] == "Возврат"
+    mask_compensation = (
+        summary_df["supplier_oper_name"] == "Добровольная компенсация при возврате"
+    )
+
+    fin_data["К перечислению за товар, руб"] = (
+        summary_df["ppvz_for_pay"] * mask_sale
+        + summary_df["ppvz_for_pay"] * mask_compensation
+        - summary_df["ppvz_for_pay"] * mask_return
     )
 
     fin_data["Логистика, руб"] = summary_df.apply(
@@ -209,16 +210,12 @@ def get_concat_data(insert_data, fin_data):
         .reset_index()
     )
 
-    # # Создание копии датафрейма
     df_fin_result = aggregated_data.copy()
-    df_fin_result = df_fin_result[df_fin_result["Артикул WB"] != 0]
 
     return df_fin_result
 
 
 def get_fin_report(folder, headers, one_date, nomenclature):
-
-    # print(folder)
     print(f"Сейчас обрабатывается финотчет {folder}. Подождите еще немного...")
     fin_report_done = None
     try:
@@ -228,17 +225,18 @@ def get_fin_report(folder, headers, one_date, nomenclature):
             "period": "daily",
         }
         insert_data = get_insert_fin_data(one_date, nomenclature)
-        response_fin_report = get_data(url_fin_report, headers, params_fin_report)
+        response_fin_report = get_wb_safe(url_fin_report, headers, params_fin_report)
         print(f"response_fin_report {response_fin_report.status_code}")
+
         if response_fin_report.status_code == 200:
             fin_report = process_fin_report(response_fin_report.json())
             fin_report_done = get_concat_data(insert_data, fin_report)
         elif response_fin_report.status_code == 204:
             fin_report_done = insert_data
         else:
-            raise ValueError(f"Непредвиденный статус-код API: {response_fin_report.status_code}")
-        sleep(60)
-
+            raise ValueError(
+                f"Непредвиденный статус-код API: {response_fin_report.status_code}"
+            )
     except Exception as e:
         print("Ошибка в запросе", folder, e)
     return fin_report_done
