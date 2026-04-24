@@ -1,10 +1,9 @@
 import os
+from time import sleep
 import pandas as pd
 import numpy as np
-from time import sleep
 
 from storage_report import get_storage_report
-
 from advertising_report import get_advert_report
 from fin_report import get_fin_report
 from nomenclature_report import get_nomenclature

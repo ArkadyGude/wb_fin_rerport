@@ -92,6 +92,13 @@ def get_advert_safe(url, headers, params=None, max_retries=5):
         f"Не удалось получить данные от рекламного API после {max_retries} попыток"
     )
 
+def countdown(seconds, prefix="Ожидание"):
+    """Отсчитывает секунды с выводом оставшегося времени в одной строке."""
+    for remaining in range(seconds, 0, -1):
+        print(f"\r{prefix}: {remaining:3d} сек", end="", flush=True)
+        sleep(1)
+    print()  # переход на новую строку после окончания
+
 
 def get_wb_safe(url, headers, params=None, max_retries=5):
     """
@@ -102,26 +109,28 @@ def get_wb_safe(url, headers, params=None, max_retries=5):
     for attempt in range(max_retries):
         resp = requests.get(url, headers=headers, params=params, timeout=35)
 
+        # Обработка 429 (Too Many Requests)
         if resp.status_code == 429:
-            retry_after = resp.headers.get("X-Ratelimit-Retry")
-            if not retry_after:
-                retry_after = resp.headers.get("X-Ratelimit-Reset")
-
+            retry_after = resp.headers.get("X-Ratelimit-Retry") or resp.headers.get("Retry-After")
             if retry_after and retry_after.isdigit():
                 wait = int(retry_after)
             else:
-                wait = 2**attempt * 30
+                wait = 2 ** attempt * 30
 
-            print(f"429, ждём {wait} сек (попытка {attempt+1}/{max_retries})")
-            sleep(wait)
+            print(f"\n[WB] 429, ждём {wait} сек (попытка {attempt+1}/{max_retries})")
+            countdown(wait, prefix="[WB] Осталось")
             continue
 
+        # Успешные ответы
         if resp.status_code in (200, 204):
             return resp
 
-        print(f"Ошибка {resp.status_code}, повтор через 30 сек")
-        sleep(30)
+        # Другие ошибки
+        print(f"\n[WB] Ошибка {resp.status_code}, повтор через 30 сек")
+        countdown(30, prefix="[WB] Повтор через")
         continue
+
+    raise Exception(f"Не удалось получить данные от WB после {max_retries} попыток")
 
     raise Exception(
         f"Не удалось получить данные после {max_retries} попыток. Последний статус: {resp.status_code}"

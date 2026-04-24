@@ -3,73 +3,41 @@ from time import sleep
 import requests
 import pandas as pd
 
-# from utils import get_api_key, get_headers
-from config import PATH_CLIENTS
-
-
-url = "https://content-api.wildberries.ru/content/v2/get/cards/list"
-
-
-def get_folder_clents(path_folder_clients):
-    p = Path(path_folder_clients)
-    clients = []
-    for folder in p.glob("*"):
-        client = str(folder)
-        clients.append(client)
-    return clients
+from config import URL_NOMENCLATURE
 
 
 def get_nomenclature(headers):
-    folders = get_folder_clents(PATH_CLIENTS)
-    for folder in folders:
-        try:
-            params = {
-                "settings": {"cursor": {"limit": 100}, "filter": {"withPhoto": -1}}
-            }
+    limit = 100
+    params = {
+        "settings": {
+            "sort": {"ascending": True},
+            "cursor": {"limit": limit},
+            "filter": {"withPhoto": -1},
+        }
+    }
 
-            item_list = []
+    all_cards = []
 
-            res = requests.post(url, headers=headers, json=params, timeout=35)
-            sleep(3)
+    while True:
+        res = requests.post(URL_NOMENCLATURE, headers=headers, json=params, timeout=35)
+        res.raise_for_status()
+        print(res.status_code)
+        data = res.json()
+        cards = data.get("cards", [])
+        all_cards.extend(cards)
 
-            print(res.status_code)
-            item_list.append(res.json())
+        if len(cards) < limit:
+            break
 
-            while res.json()["cursor"]["total"] == 100:
-                if res.json()["cursor"]["total"] == 100:
-                    updatedAt = res.json()["cursor"]["updatedAt"]
-                    nmID = res.json()["cursor"]["nmID"]
-                    params = {
-                        "settings": {
-                            "cursor": {
-                                "updatedAt": updatedAt,
-                                "nmID": nmID,
-                                "limit": 100,
-                            },
-                            "filter": {"withPhoto": -1},
-                        }
-                    }
+        cursor = data["cursor"]
+        params["settings"]["cursor"]["updatedAt"] = cursor["updatedAt"]
+        params["settings"]["cursor"]["nmID"] = cursor["nmID"]
 
-                    res = requests.post(url, headers=headers, json=params, timeout=35)
-                    sleep(3)
+        sleep(10)
 
-                print(res.status_code)
-                sleep(5)
-                item_list.append(res.json())
+    nomenclature_list = [
+        {"Артикул WB": card["nmID"], "Предмет": card["subjectName"]}
+        for card in all_cards
+    ]
 
-            nomenclature_list = []
-
-            for k in item_list:
-                for item in k["cards"]:
-                    nomenclature_dict = {
-                        "Артикул WB": item["nmID"],
-                        "Предмет": item["subjectName"],
-                    }
-                    nomenclature_list.append(nomenclature_dict)
-
-            nomenclature_df = pd.DataFrame(nomenclature_list)
-
-            nomenclature_df = nomenclature_df[["Артикул WB", "Предмет"]]
-        except Exception as e:
-            print("ERROR", e)
-    return nomenclature_df
+    return pd.DataFrame(nomenclature_list)[["Артикул WB", "Предмет"]]
